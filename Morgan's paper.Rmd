@@ -1,0 +1,53 @@
+---
+title: "Morgan's paper"
+---
+
+## Read data
+Microarray
+```{r}
+library(phyloseq)
+library(Biobase)
+library(GEOquery)
+gset <- getGEO("GSE65270", GSEMatrix =TRUE, getGPL=FALSE)
+if (length(gset) > 1) idx <- grep("GPL6244", attr(gset, "names")) else idx <- 1
+gset <- gset[[idx]]
+expgset<-exprs(gset)
+expgset<-data.frame(expgset)
+```  
+  
+Metadata
+```{r}
+studymetadata<- read.delim("~/Desktop/Pouchitis2015_Metadata_1.txt")
+studyotutable<- read.delim("~/Desktop/otu_table.txt")
+studytax<-studyotutable[,ncol(studyotutable)]
+otutable<-studyotutable[,-c(1,ncol(studyotutable))]
+library(tidyr)
+studytax<-data.frame(studytax)
+studytaxtable<-separate(studytax,studytax,into=c("k","p","c","o","f","g"),sep = ";")
+```
+create phyloseq
+```{r}
+metadata16sid<-as.character(studymetadata$X16S_ID)#273,N00002
+otutable_intersect<-otutable[,names(otutable) %in% metadata16sid]
+phyotu<-as(otutable_intersect,"matrix")
+rownames(phyotu)<-rownames(otutable_intersect)
+META<-subset(studymetadata,X16S_ID %in% colnames(otutable_intersect))
+rownames(META)<-META$X16S_ID
+META<-sample_data(META)
+phyotu<-phyotu[,rownames(META)]
+OTU<-otu_table(phyotu, taxa_are_rows = TRUE)
+phytax<-as(studytaxtable,"matrix")
+rownames(phytax)<-rownames(OTU)
+TAX<-tax_table(phytax)
+sphy<-phyloseq(OTU,TAX,META)
+#TRANSCRIPTOME_255
+GSM2pouch<-read.csv("~/Desktop/GSM2pouch.csv")[,2:3]
+GSM2pouch<-subset(GSM2pouch,X.1 %in% META$Patient_ID)
+TRANS<-expgset[,GSM2pouch$X.2]
+```  
+
+Prevalence filtering
+```{r}
+sphy1<-filter_taxa(sphy, function(x) sum(x>=3)>=3, TRUE)
+
+```
